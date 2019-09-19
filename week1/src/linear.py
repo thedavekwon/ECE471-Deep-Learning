@@ -5,12 +5,13 @@ import tensorflow as tf
 
 from tqdm import trange
 
+import matplotlib.pyplot as plt
+
 NUM_FEATURES = 4
 NUM_SAMP = 50
 BATCH_SIZE = 32
-NUM_BATCHES = 300
+NUM_BATCHES = 400
 LEARNING_RATE = 0.1
-
 
 class Data(object):
     def __init__(self, num_features=NUM_FEATURES, num_samp=NUM_SAMP):
@@ -23,12 +24,15 @@ class Data(object):
         np.random.seed(31415)
 
         # We're going to learn these paramters
-        self.w = np.random.randint(low=0, high=5, size=(num_features, 1))
+        self.w = np.random.randint(low=0, high=10, size=(num_features, 1))
         self.b = 2
 
         self.index = np.arange(num_samp)
         self.x = np.random.uniform(size=(num_samp, num_features))
         self.y = self.x @ self.w + self.b + sigma * np.random.normal()
+        
+        # print(self.x.shape)
+        # print(self.y.shape)
 
     def get_batch(self, batch_size=BATCH_SIZE):
         """
@@ -54,6 +58,13 @@ class Model(tf.Module):
 if __name__ == "__main__":
     data = Data()
     model = Model()
+    
+    #################
+    # added
+    plt.plot(data.x, data.y, 'o')
+    plt.show()
+    #################
+    
     optimizer = tf.optimizers.SGD(learning_rate=LEARNING_RATE)
 
     bar = trange(NUM_BATCHES)
