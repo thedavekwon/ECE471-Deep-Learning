@@ -18,8 +18,7 @@ EPOCH = 20
 
 class MNISTDataset(data.Dataset):
     def __init__(self, path, transform):
-        self.path = path
-        self.images = [transform(io.imread(os.path.join(self.path, file))) for file in os.listdir(path)]
+        self.images = [transform(io.imread(os.path.join(path, file))) for file in os.listdir(path)]
         self.labels = [int(file[-5]) for file in os.listdir(path)]
     def __len__(self):
         return len(self.labels)
