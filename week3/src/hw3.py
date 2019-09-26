@@ -36,8 +36,10 @@ transform = transforms.Compose(
     [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
 )
 
-# save("dataset/MNIST/train", transform)
-# save("dataset/MNIST/test", transform)
+if "train.p" not in os.listdir("dataset/MNIST"):
+    save("dataset/MNIST/train", transform)
+if "test.p" not in os.listdir("dataset/MNIST"):
+    save("dataset/MNIST/test", transform)
 
 
 class MNISTDataset(data.Dataset):
@@ -75,19 +77,22 @@ class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
         self.conv1 = nn.Conv2d(1, 8, 1, padding=1)
+        self.bm1 = nn.BatchNorm2d(8)
         self.conv2 = nn.Conv2d(8, 16, 3, padding=1)
+        self.bm2 = nn.BatchNorm2d(16)
         self.conv3 = nn.Conv2d(16, 16, 5, padding=2)
+        self.bm3 = nn.BatchNorm2d(16)
         self.pool = nn.MaxPool2d(2)
-        self.drop = nn.Dropout(0.3)
+        self.drop = nn.Dropout(0.4)
 
         self.fc1 = nn.Linear(144, 64)
         self.fc2 = nn.Linear(64, 64)
         self.fc3 = nn.Linear(64, 10)
 
     def forward(self, x):
-        x = self.pool(self.drop(F.relu(self.conv1(x))))
-        x = self.pool(self.drop(F.relu(self.conv2(x))))
-        x = self.pool(self.drop(F.relu(self.conv3(x))))
+        x = self.pool(self.drop(self.bm1(F.relu(self.conv1(x)))))
+        x = self.pool(self.drop(self.bm2(F.relu(self.conv2(x)))))
+        x = self.pool(self.drop(self.bm3(F.relu(self.conv3(x)))))
         x = x.view(-1, self.num_flat_features(x))
         x = self.drop(F.relu(self.fc1(x)))
         x = self.drop(F.relu(self.fc2(x)))
@@ -199,7 +204,7 @@ def accuracy_plot(train_accuracies, accuracies, TEST):
     plt.plot(range(1, len(train_accuracies)+1), train_accuracies)
     plt.plot(range(1, len(accuracies)+1), accuracies)
     plt.xlabel("epoch")
-    plt.ylabel("accuracy (%)").set_rotation(0)
+    plt.ylabel("accuracy\n(%)").set_rotation(0)
     
     
     if (TEST):
@@ -220,9 +225,9 @@ def losses_plot(train_losses, losses, TEST):
     else:
         plt.legend(["train", "validation"])
 
-LEARNING_RATE = 0.004
-EPOCH = 20
-LAMBDA = 0.002
+LEARNING_RATE = 0.001
+EPOCH = 50
+LAMBDA = 0.003
 TEST = True
 
 if __name__ == "__main__":
@@ -230,8 +235,8 @@ if __name__ == "__main__":
 
     train_loader, vali_loader, test_loader = load_data()
 
-    model = Model()
-    # model = EfficientModel()
+    # model = Model()
+    model = EfficientModel()
     model.to(device)
 
     summary(model, (1, 28, 28))
