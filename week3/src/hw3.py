@@ -25,10 +25,10 @@ def load(path):
         tmp = pickle.load(f)
     return tmp["images"], tmp["labels"]
 
-# transform = transforms.Compose(
-#             [transforms.ToTensor(),
-#              transforms.Normalize((0.1307,), (0.3081,))]
-#             )
+transform = transforms.Compose(
+            [transforms.ToTensor(),
+             transforms.Normalize((0.1307,), (0.3081,))]
+            )
 # save("dataset/MNIST/train", transform)
 # save("dataset/MNIST/test", transform)
 
@@ -65,18 +65,19 @@ class Model(nn.Module):
         self.conv2 = nn.Conv2d(8, 16, 3, padding=1)
         self.conv3 = nn.Conv2d(16, 16, 5, padding=2)
         self.pool = nn.MaxPool2d(2)
+        self.drop = nn.Dropout(0.2)
         
         self.fc1 = nn.Linear(144, 64)
         self.fc2 = nn.Linear(64, 64)
         self.fc3 = nn.Linear(64, 10)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
+        x = self.pool(self.drop(F.relu(self.conv1(x))))
+        x = self.pool(self.drop(F.relu(self.conv2(x))))
+        x = self.pool(self.drop(F.relu(self.conv3(x))))
         x = x.view(-1, self.num_flat_features(x))
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        x = self.drop(F.relu(self.fc1(x)))
+        x = self.drop(F.relu(self.fc2(x)))
         x = self.fc3(x)
         return x
 
@@ -88,34 +89,35 @@ class EfficientModel(nn.Module):
         super(EfficientModel, self).__init__()
         self.conv1 = nn.Conv2d(1, 16, 1)
         self.bm1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 1, 3, stride=2)
-        # self.bm2 = nn.BatchNorm2d(1)
-        # self.conv3 = nn.Conv2d(4, 1, 1)
+        self.conv2 = nn.Conv2d(16, 1, 3)
+        self.conv3 = nn.Conv2d(1, 4, 3)
+        self.bm3 = nn.BatchNorm2d(4)
+        self.conv4 = nn.Conv2d(4, 1, 1)
         
-        self.fc1 = nn.Linear(9, 10)
-        self.fc2 = nn.Linear(10, 10)
-        self.fc3 = nn.Linear(9, 10)
+        self.fc1 = nn.Linear(4, 10)
+        # self.fc2 = nn.Linear(10, 10)
+        # self.fc3 = nn.Linear(9, 10)
 
         self.pool = nn.MaxPool2d(2)
         self.avgPool = nn.AvgPool2d(2)
         self.drop = nn.Dropout(0.1)
         
     def forward(self, x):
-        x = self.pool(self.drop(self.bm1(F.relu(self.conv1(x)))))
+        x = self.pool(self.drop(self.bm1(F.elu(self.conv1(x)))))
         # x = self.pool(self.drop(self.bm2(F.relu(self.conv2(x)))))
-        x = self.avgPool(self.drop(F.relu(self.conv2(x))))
-
-        # x = self.avgPool(self.drop(F.relu(self.conv3(x))))
+        x = self.drop(F.relu(self.conv2(x)))
+        x = self.pool(self.bm3(F.relu(self.conv3(x))))
+        x = self.pool(F.elu(self.conv4(x)))
         x = x.view(-1, self.num_flat_features(x))
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
+        # x = F.relu(self.fc1(x))
+        x = self.fc1(x)
 
         return x
 
     def num_flat_features(self, x):
         return functools.reduce(lambda a, b: a * b, x.size()[1:])
 
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.005
 EPOCH = 100
 
 if __name__ == "__main__":
@@ -123,8 +125,8 @@ if __name__ == "__main__":
 
     train_loader, vali_loader, test_loader = load_data()
     
-    # model = Model()
-    model = EfficientModel()
+    model = Model()
+    # model = EfficientModel()
     model.to(device)
     
     summary(model, (1, 28, 28))
@@ -133,7 +135,6 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
     for epoch in range(1, EPOCH + 1):
-        train_loss = 0.0
         for inputs, labels in train_loader:
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -141,7 +142,6 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
-            train_loss += loss.item()
             loss.backward()
             optimizer.step()
             
@@ -158,5 +158,23 @@ if __name__ == "__main__":
                 correct += pred.eq(target.view_as(pred)).sum().item()
     
         vali_loss /= len(vali_loader.dataset)
-        percentage = round(correct / len(vali_loader.dataset)*100, 2)
-        print(f"Average Train loss: {train_loss:0.6f}, Average Validation loss: {vali_loss:0.6f}, Accuracy:{correct}/{len(vali_loader.dataset)} ({percentage}%)")
+        vali_percentage = round(correct / len(vali_loader.dataset)*100, 2)
+
+        test_loss = 0.0
+        correct = 0
+        with torch.no_grad():
+            for data, target in test_loader:
+                data = data.to(device)
+                target = target.to(device)
+                outputs = model(data)
+                test_loss += criterion(outputs, target).item()
+                outputs = F.softmax(outputs, dim=1)
+                pred = outputs.argmax(dim=1, keepdim=True)
+                correct += pred.eq(target.view_as(pred)).sum().item()
+    
+        test_loss /= len(test_loader.dataset)
+        test_percentage = round(correct / len(test_loader.dataset)*100, 2)
+        
+
+        print(f"Average Validation loss: {vali_loss:0.6f}, Validation Accuracy:{correct}/{len(vali_loader.dataset)} ({vali_percentage}%)")
+        print(f"Average Test loss: {test_loss:0.6f}, Test Accuracy:{correct}/{len(test_loader.dataset)} ({test_percentage}%)")
