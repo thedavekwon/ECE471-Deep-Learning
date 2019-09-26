@@ -120,6 +120,7 @@ class EfficientModel(nn.Module):
 LEARNING_RATE = 0.005
 EPOCH = 100
 
+# Validation
 if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -135,46 +136,89 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
     for epoch in range(1, EPOCH + 1):
-        for inputs, labels in train_loader:
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-    
+        correct = 0
+        for X, y in train_loader:
+            X = X.to(device)
+            y = y.to(device)
             optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            outputs = model(X)
+            regularization_loss = 0.0
+            for param in model.parameters():
+                regularization_loss += torch.norm(param)
+            loss = criterion(outputs, y) + LAMBDA * regularization_loss
             loss.backward()
             optimizer.step()
+            outputs = F.softmax(outputs, dim=1)
+            pred = outputs.argmax(dim=1, keepdim=True)
+            correct += pred.eq(y.view_as(pred)).sum().item()
+        train_percentage = round(correct / len(train_loader.dataset)*100, 2)
+        print(f"Train Accuracy:{correct}/{len(train_loader.dataset)} ({train_percentage}%)")
             
         vali_loss = 0.0
         correct = 0
         with torch.no_grad():
-            for data, target in vali_loader:
-                data = data.to(device)
-                target = target.to(device)
-                outputs = model(data)
-                vali_loss += criterion(outputs, target).item()
+            for X, y in vali_loader:
+                X = X.to(device)
+                y = y.to(device)
+                outputs = model(X)
+                vali_loss += criterion(outputs, y).item()
                 outputs = F.softmax(outputs, dim=1)
                 pred = outputs.argmax(dim=1, keepdim=True)
-                correct += pred.eq(target.view_as(pred)).sum().item()
-    
+                correct += pred.eq(y.view_as(pred)).sum().item()
+
         vali_loss /= len(vali_loader.dataset)
         vali_percentage = round(correct / len(vali_loader.dataset)*100, 2)
+        
+
+        print(f"Average Validation loss: {vali_loss:0.6f}, Validation Accuracy:{correct}/{len(vali_loader.dataset)} ({vali_percentage}%)")
+        
+        
+# Test
+if __name__ == "__main__":
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    train_loader, vali_loader, test_loader = load_data()
+    
+    model = Model()
+    # model = EfficientModel()
+    model.to(device)
+    
+    summary(model, (1, 28, 28))
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    
+    for epoch in range(1, EPOCH + 1):
+        correct = 0
+        for X, y in train_loader:
+            X = X.to(device)
+            y = y.to(device)
+            optimizer.zero_grad()
+            outputs = model(X)
+            regularization_loss = 0.0
+            for param in model.parameters():
+                regularization_loss += torch.norm(param)
+            loss = criterion(outputs, y) + LAMBDA * regularization_loss
+            loss.backward()
+            optimizer.step()
+            outputs = F.softmax(outputs, dim=1)
+            pred = outputs.argmax(dim=1, keepdim=True)
+            correct += pred.eq(y.view_as(pred)).sum().item()
+        train_percentage = round(correct / len(train_loader.dataset)*100, 2)
+        print(f"Train Accuracy:{correct}/{len(train_loader.dataset)} ({train_percentage}%)")
 
         test_loss = 0.0
         correct = 0
         with torch.no_grad():
-            for data, target in test_loader:
-                data = data.to(device)
-                target = target.to(device)
-                outputs = model(data)
-                test_loss += criterion(outputs, target).item()
+            for X, y in test_loader:
+                X = X.to(device)
+                y = y.to(device)
+                outputs = model(X)
+                test_loss += criterion(outputs, y).item()
                 outputs = F.softmax(outputs, dim=1)
                 pred = outputs.argmax(dim=1, keepdim=True)
-                correct += pred.eq(target.view_as(pred)).sum().item()
-    
+                correct += pred.eq(y.view_as(pred)).sum().item()
+
         test_loss /= len(test_loader.dataset)
         test_percentage = round(correct / len(test_loader.dataset)*100, 2)
-        
-
-        print(f"Average Validation loss: {vali_loss:0.6f}, Validation Accuracy:{correct}/{len(vali_loader.dataset)} ({vali_percentage}%)")
         print(f"Average Test loss: {test_loss:0.6f}, Test Accuracy:{correct}/{len(test_loader.dataset)} ({test_percentage}%)")
