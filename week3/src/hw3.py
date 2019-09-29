@@ -36,10 +36,10 @@ transform = transforms.Compose(
     [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
 )
 
-if "train.p" not in os.listdir("dataset/MNIST"):
-    save("dataset/MNIST/train", transform)
-if "test.p" not in os.listdir("dataset/MNIST"):
-    save("dataset/MNIST/test", transform)
+# if "train.p" not in os.listdir("dataset/MNIST"):
+#     save("dataset/MNIST/train", transform)
+# if "test.p" not in os.listdir("dataset/MNIST"):
+#     save("dataset/MNIST/test", transform)
 
 
 class MNISTDataset(data.Dataset):
@@ -72,7 +72,7 @@ def load_data():
     )
     return train_loader, vali_loader, test_loader
 
-# accuracy of 98.83%
+# accuracy of 98.5%
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
@@ -113,8 +113,8 @@ class EfficientModel(nn.Module):
         self.bm3 = nn.BatchNorm2d(4)
         self.conv4 = nn.Conv2d(4, 1, 1)
 
-        self.fc1 = nn.Linear(4, 10)
-        # self.fc2 = nn.Linear(10, 10)
+        self.fc1 = nn.Linear(4, 4)
+        self.fc2 = nn.Linear(4, 10)
         # self.fc3 = nn.Linear(9, 10)
 
         self.pool = nn.MaxPool2d(2)
@@ -123,13 +123,12 @@ class EfficientModel(nn.Module):
 
     def forward(self, x):
         x = self.pool(self.drop(self.bm1(F.elu(self.conv1(x)))))
-        # x = self.pool(self.drop(self.bm2(F.relu(self.conv2(x)))))
         x = self.drop(F.relu(self.conv2(x)))
         x = self.pool(self.bm3(F.relu(self.conv3(x))))
         x = self.pool(F.elu(self.conv4(x)))
         x = x.view(-1, self.num_flat_features(x))
-        # x = F.relu(self.fc1(x))
-        x = self.fc1(x)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
 
         return x
 
@@ -175,7 +174,7 @@ def validate(model, vali_loader, optimizer, criterion, device):
     vali_loss /= len(vali_loader.dataset)
     vali_percentage = round(correct / len(vali_loader.dataset) * 100, 2)
     print(
-        f"Average Validation loss: {vali_loss:0.6f}, Validation Accuracy:{correct}/{len(vali_loader.dataset)} ({vali_percentage}%)"
+        f"Validation loss: {vali_loss:0.6f}, Validation Accuracy:{correct}/{len(vali_loader.dataset)} ({vali_percentage}%)"
     )
     return vali_percentage, vali_loss
 
@@ -196,7 +195,7 @@ def test(model, test_loader, optimizer, criterion, device):
 
     test_percentage = round(correct / len(test_loader.dataset) * 100, 2)
     print(
-        f"Average Test loss: {test_loss:0.6f}, Test Accuracy:{correct}/{len(test_loader.dataset)} ({test_percentage}%)"
+        f"Test loss: {test_loss:0.6f}, Test Accuracy:{correct}/{len(test_loader.dataset)} ({test_percentage}%)"
     )
     return test_percentage, test_loss
 
@@ -235,8 +234,8 @@ if __name__ == "__main__":
 
     train_loader, vali_loader, test_loader = load_data()
 
-    # model = Model()
-    model = EfficientModel()
+    model = Model()
+    # model = EfficientModel()
     model.to(device)
 
     summary(model, (1, 28, 28))
