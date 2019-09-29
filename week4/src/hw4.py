@@ -26,12 +26,12 @@ def load_CIFAR10_data():
     test_set = torchvision.datasets.CIFAR10(root='./dataset', train=False,
                                             download=True, transform=transform)
 
-    train_loader = data.DataLoader(train_set, batch_size=16,
-                                   shuffle=True, num_workers=2)
-    validation_loader = data.DataLoader(validation_set, batch_size=16,
-                                        shuffle=True, num_workers=2)
-    test_loader = data.DataLoader(test_set, batch_size=16,
-                                  shuffle=True, num_workers=2)
+    train_loader = data.DataLoader(train_set, batch_size=4096,
+                                   shuffle=True, num_workers=0)
+    validation_loader = data.DataLoader(validation_set, batch_size=4096,
+                                        shuffle=True, num_workers=0)
+    test_loader = data.DataLoader(test_set, batch_size=4096,
+                                  shuffle=True, num_workers=0)
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     return train_loader, validation_loader, test_loader, classes
 
@@ -49,11 +49,11 @@ def load_CIFAR100_data():
     test_set = torchvision.datasets.CIFAR100(root='./dataset', train=False,
                                              download=True, transform=transform)
 
-    train_loader = data.DataLoader(train_set, batch_size=16,
+    train_loader = data.DataLoader(train_set, batch_size=1024,
                                    shuffle=True, num_workers=2)
-    validation_loader = data.DataLoader(validation_set, batch_size=16,
+    validation_loader = data.DataLoader(validation_set, batch_size=1024,
                                         shuffle=True, num_workers=2)
-    test_loader = data.DataLoader(test_set, batch_size=16,
+    test_loader = data.DataLoader(test_set, batch_size=1024,
                                   shuffle=True, num_workers=2)
 
     return train_loader, validation_loader, test_loader
@@ -188,13 +188,13 @@ class CIFAR10Model(nn.Module):
         super(CIFAR10Model, self).__init__()
         self.conv1 = convLayer(3, 6, 5, 2)
         self.conv2 = convLayer(6, 16, 5, 2)
-        self.conv3 = convLayer(16, 16, 3, 2)
+#         self.conv3 = convLayer(16, 32, 1, 2)
         self.flatten = Flatten()
-        self.fc1 = nn.Linear(16, 10)
-        self.fc2 = nn.Linear(10, 10)
-        self.fc3 = nn.Linear(10, 10)
-        self.layers = [self.conv1, self.conv2, self.conv3, self.flatten, self.fc1, self.fc2, self.fc3]
-        self.activations = [False, False, False, False, True, True, True]
+        self.fc1 = nn.Linear(400, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 10)
+        self.layers = [self.conv1, self.conv2, self.flatten, self.fc1, self.fc2, self.fc3]
+        self.activations = [False, False, False, True, True, True]
 
     def forward(self, x):
         for layer, activation in zip(self.layers, self.activations):
@@ -205,9 +205,9 @@ class CIFAR10Model(nn.Module):
         return x
 
 
-EPOCH = 10
+EPOCH = 100
 TEST = True
-LAMBDA = 0.1
+LAMBDA = 0.01
 
 if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
