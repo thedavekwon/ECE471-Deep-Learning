@@ -11,6 +11,8 @@ import torchvision.models as models
 
 from torch.utils import data
 from torchsummary import summary
+
+from resnet import ResNet, Bottleneck
     
 def load_CIFAR10_data():
     transform = transforms.Compose(
@@ -223,8 +225,8 @@ class CIFAR10Model(nn.Module):
         return x
 
 class CIFAR100Model(nn.Module):
-    def __init__(self, num_classes):
-        super(CIFAR10Model, self).__init__()
+    def __init__(self):
+        super(CIFAR100Model, self).__init__()
         self.conv1 = convLayer(3, 64, 3, 2, 1, 0.4)
         self.conv2 = convLayer(64, 128, 3, 0, 1, 0.4)
         self.conv3 = convLayer(128, 256, 5, 2, 1, 0.4)
@@ -274,12 +276,15 @@ TEST = True
 LAMBDA = 0.03
 
 if __name__ == "__main__":
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     train_loader, validation_loader, test_loader, classes = load_CIFAR10_data()
-    model = CIFAR10Model()
+    # model = CIFAR10Model()
+    # model = CIFAR100Model()
+    model = ResNet(Bottleneck, [3, 8, 36, 3], 10)
     model.to(device)
     
-    summary(model, (3, 32, 32))
+    summary(model, (3, 32, 32), device="cpu")
     
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters())
