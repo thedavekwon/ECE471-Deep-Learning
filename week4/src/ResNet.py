@@ -49,7 +49,7 @@ class Block(nn.Module):
         return self.in_channels != self.out_channels
 
 class ResNetBlock(Block):
-    def __init__(self, in_channels, out_channels, expansion, downsampling=1, conv=conv3x3, *args, **kwargs):
+    def __init__(self, in_channels, out_channels, expansion=1, downsampling=1, conv=conv3x3, *args, **kwargs):
         super().__init__(in_channels, out_channels)
         self.expansion, self.downsampling, self.conv = expansion, downsampling, conv
         if self.residual:
@@ -96,7 +96,7 @@ class ResNetBottleNeckBlock(ResNetBlock):
         )
 
 class ResNetLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, block=ResNetBasicBlock, n=1, *args, **kwargs):
+    def __init__(self, in_channels, out_channels, block=ResNetBottleNeckBlock, n=1, *args, **kwargs):
         super().__init__()
         downsampling = 2 if in_channels != out_channels else 1
         self.blocks = nn.Sequential(
@@ -109,6 +109,34 @@ class ResNetLayer(nn.Module):
         x = self.blocks(x)
         return x
 
+class ResNetEncoderNoMaxPool(nn.Module):
+    def __init__(self, in_channels=3, block_sizes=[64, 128, 256, 512],
+                 depths=[2, 2, 2, 2], activation='relu', block=ResNetBasicBlock,
+                 *args, **kwargs):
+        super().__init__()
+        self.block_sizes = block_sizes
+        self.activation=activation
+        self.gate = nn.Sequential(
+            nn.Conv2d(in_channels, self.block_sizes[0], kernel_size=7, stride=2, padding=3, bias=False),
+            nn.BatchNorm2d(self.block_sizes[0]),
+            activation_func(activation),
+        )
+        
+        self.in_out_block_sizes = list(zip(block_sizes, block_sizes[1:]))
+        self.blocks = nn.ModuleList([
+            ResNetLayer(block_sizes[0], block_sizes[0], n=depths[0],
+                        activation=self.activation, block=block, *args, **kwargs),
+            *[ResNetLayer(in_channels*block.expansion, out_channels, n=n,
+                          activation=self.activation, block=block, *args, **kwargs)
+                          for (in_channels, out_channels), n in zip(self.in_out_block_sizes, depths[1:])]
+        ])
+    
+    def forward(self, x):
+        x = self.gate(x)
+        for block in self.blocks:
+            x = block(x)
+        return x
+    
 class ResNetEncoder(nn.Module):
     def __init__(self, in_channels=3, block_sizes=[64, 128, 256, 512],
                  depths=[2, 2, 2, 2], activation='relu', block=ResNetBasicBlock,
@@ -151,18 +179,36 @@ class ResNetDecoder(nn.Module):
         return x
 
 class ResNet(nn.Module):
-    def __init__(self, in_channels, n_classes, *args, **kwargs):
+    def __init__(self, in_channels, n_classes, maxpool, *args, **kwargs):
         super(ResNet, self).__init__()
-        self.encoder = ResNetEncoder(in_channels, *args, **kwargs)
+        if maxpool:
+            self.encoder = ResNetEncoder(in_channels, *args, **kwargs)  
+        else:
+            self.encoder = ResNetEncoderNoMaxPool(in_channels, *args, **kwargs)
         self.decoder = ResNetDecoder(self.encoder.blocks[-1].blocks[-1].expanded_channels, n_classes)
-        
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
     def forward(self, x):
         x = self.encoder(x)
         x = self.decoder(x)
         return x
+
     
+def resnet(in_channels, n_classes, block=ResNetBottleNeckBlock):
+    return ResNet(in_channels, n_classes, maxpool=True, block=block, depths=[1, 1, 1, 1])
+
+def resnet18(in_channels, n_classes, block=ResNetBasicBlock):
+    return ResNet(in_channels, n_classes, maxpool=True, block=block, deepths=[2, 2, 2, 2])
+
+def resnet50(in_channels, n_classes, block=ResNetBottleNeckBlock):
+    return ResNet(in_channels, n_classes, maxpool=True, block=block, deepths=[3, 4, 6, 3])
+
 def resnet101(in_channels, n_classes, block=ResNetBottleNeckBlock):
-    return ResNet(in_channels, n_classes, block=block, depths=[3, 4, 23, 3])
-    
-model = resnet101(3, 10).cuda()
-summary(model, (3, 32, 32))
+    return ResNet(in_channels, n_classes, maxpool=True, block=block, depths=[3, 4, 23, 3])
+
+def resnet151(in_channels, n_classes, block=ResNetBottleNeckBlock):
+    return ResNet(in_channels, n_classes, maxpool=True, block=block, depths=[3, 8, 36, 3])
