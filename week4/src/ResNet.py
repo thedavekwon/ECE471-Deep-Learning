@@ -82,6 +82,20 @@ class ResNetBasicBlock(ResNetBlock):
             conv_bn(self.out_channels, self.expanded_channels, conv=self.conv, bias=False)
         )
 
+class ResNetBasicDropOutBlock(ResNetBlock):
+    expansion = 1
+    """
+    two layers of 3x3 conv/batch norm/activation
+    """
+    def __init__(self, in_channels, out_channels, *args, **kwargs):
+        super().__init__(in_channels, out_channels, *args, **kwargs)
+        self.blocks = nn.Sequential(
+            conv_bn(self.in_channels, self.out_channels, conv=self.conv, bias=False, stride=self.downsampling),
+            nn.Dropout(0.2),
+            activation_func(self.activation),
+            conv_bn(self.out_channels, self.expanded_channels, conv=self.conv, bias=False)
+        )
+
 
 class ResNetBottleNeckBlock(ResNetBlock):
     expansion = 4
@@ -91,6 +105,20 @@ class ResNetBottleNeckBlock(ResNetBlock):
             conv_bn(self.in_channels, self.out_channels, self.conv, kernel_size=1),
             activation_func(self.activation),
             conv_bn(self.out_channels, self.out_channels, self.conv, kernel_size=3, stride=self.downsampling),
+            activation_func(self.activation),
+            conv_bn(self.out_channels, self.expanded_channels, self.conv, kernel_size=1)
+        )
+
+class ResNetBottleNeckDropOutBlock(ResNetBlock):
+    expansion = 4
+    def __init__(self, in_channels, out_channels, *args, **kwargs):
+        super().__init__(in_channels, out_channels, expansion=4, *args, **kwargs)
+        self.blocks = nn.Sequential(
+            conv_bn(self.in_channels, self.out_channels, self.conv, kernel_size=1),
+            nn.Dropout(0.2),
+            activation_func(self.activation),
+            conv_bn(self.out_channels, self.out_channels, self.conv, kernel_size=3, stride=self.downsampling),
+            nn.Dropout(0.2),
             activation_func(self.activation),
             conv_bn(self.out_channels, self.expanded_channels, self.conv, kernel_size=1)
         )
@@ -197,18 +225,29 @@ class ResNet(nn.Module):
         x = self.decoder(x)
         return x
 
+
     
-def resnet(in_channels, n_classes, block=ResNetBottleNeckBlock):
+def resnet(in_channels, n_classes, block=ResNetBottleNeckBlock, drop=False):
+    if (drop):
+        return ResNet(in_channels, n_classes, maxpool=True, block=ResNetBasicDropOutBlock, depths=[1, 1, 1, 1])
     return ResNet(in_channels, n_classes, maxpool=True, block=block, depths=[1, 1, 1, 1])
 
-def resnet18(in_channels, n_classes, block=ResNetBasicBlock):
+def resnet18(in_channels, n_classes, block=ResNetBasicBlock, drop=False):
+    if (drop):
+        return ResNet(in_channels, n_classes, maxpool=True, block=ResNetBasicDropOutBlock, depths=[2, 2, 2, 2])
     return ResNet(in_channels, n_classes, maxpool=True, block=block, deepths=[2, 2, 2, 2])
 
-def resnet50(in_channels, n_classes, block=ResNetBottleNeckBlock):
+def resnet50(in_channels, n_classes, block=ResNetBottleNeckBlock, drop=False):
+    if (drop):
+        return ResNet(in_channels, n_classes, maxpool=True, block=ResNetBottleNeckDropOutBlock, depths=[3, 4, 6, 3])
     return ResNet(in_channels, n_classes, maxpool=True, block=block, deepths=[3, 4, 6, 3])
 
-def resnet101(in_channels, n_classes, block=ResNetBottleNeckBlock):
+def resnet101(in_channels, n_classes, block=ResNetBottleNeckBlock, drop=False):
+    if (drop):
+        return ResNet(in_channels, n_classes, maxpool=True, block=ResNetBottleNeckDropOutBlock, depths=[3, 4, 23, 3])
     return ResNet(in_channels, n_classes, maxpool=True, block=block, depths=[3, 4, 23, 3])
 
-def resnet151(in_channels, n_classes, block=ResNetBottleNeckBlock):
+def resnet151(in_channels, n_classes, block=ResNetBottleNeckBlock, drop=False):
+    if (drop):
+        return ResNet(in_channels, n_classes, maxpool=True, block=ResNetBottleNeckDropOutBlock, depths=[3, 8, 36, 3])
     return ResNet(in_channels, n_classes, maxpool=True, block=block, depths=[3, 8, 36, 3])
